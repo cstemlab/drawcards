@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Drawing Cards</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg1: #0b1020;
+      --bg2: #0f1b3d;
+      --bg3: #101b33;
+      --card-glass: rgba(255,255,255,0.06);
+      --card-glass-strong: rgba(255,255,255,0.12);
+      --text: #E6EEFF;
+      --muted: #A9B4CE;
+      --accent: #7C9EFF;
+      --accent-2: #9bffd9;
+      --shadow-1: rgba(0,0,0,0.5);
+      --shadow-2: rgba(0,0,0,0.28);
+      --border: rgba(255,255,255,0.14);
+      --focus: #8bd5ff;
+      --success: #56f2c6;
+      --warning: #ffd37a;
+      --error: #ff7a7a;
+    }
+    [data-theme="light"] {
+      --bg1: #e9f1ff;
+      --bg2: #f2f7ff;
+      --bg3: #ffffff;
+      --card-glass: rgba(255,255,255,0.75);
+      --card-glass-strong: rgba(255,255,255,0.9);
+      --text: #0b1020;
+      --muted: #3b4460;
+      --accent: #3a63ff;
+      --accent-2: #1bb07a;
+      --shadow-1: rgba(0,0,0,0.2);
+      --shadow-2: rgba(0,0,0,0.1);
+      --border: rgba(0,0,0,0.1);
+      --focus: #2249ff;
+      --success: #1bb07a;
+      --warning: #d99500;
+      --error: #d24a4a;
+    }
+
+    html, body {
+      height: 100%;
+      scroll-behavior: smooth;
+      background: radial-gradient(1200px 800px at 10% 10%, var(--bg2), transparent 70%),
+                  radial-gradient(1200px 800px at 90% 30%, var(--bg3), transparent 60%),
+                  linear-gradient(180deg, var(--bg1), var(--bg2));
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    }
+
+    /* Subtle noise overlay using SVG filter (no external images) */
+    .noise-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.07;
+      mix-blend-mode: soft-light;
+      z-index: 1;
+    }
+    .noise-overlay:before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 10% 10%, rgba(255,255,255,0.08), transparent 35%),
+                  radial-gradient(circle at 80% 20%, rgba(255,255,255,0.06), transparent 40%),
+                  radial-gradient(circle at 50% 80%, rgba(255,255,255,0.05), transparent 45%);
+      filter: url(#noise);
+    }
+    svg#noise-filter {
+      position: absolute;
+      width: 0;
+      height: 0;
+    }
+
+    .glass {
+      background: var(--card-glass);
+      backdrop-filter: saturate(160%) blur(16px);
+      -webkit-backdrop-filter: saturate(160%) blur(16px);
+      border: 1px solid var(--border);
+      box-shadow:
+        14px 14px 28px var(--shadow-1),
+        -10px -10px 24px rgba(255,255,255,0.04),
+        inset 0 1px 0 rgba(255,255,255,0.08);
+      border-radius: 18px;
+    }
+
+    .btn {
+      position: relative;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      color: var(--text);
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(0,0,0,0.06));
+      box-shadow:
+        8px 8px 18px var(--shadow-2),
+        inset 0 1px 0 rgba(255,255,255,0.08);
+      transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.3s ease, opacity 0.2s ease;
+    }
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow:
+        12px 12px 24px var(--shadow-2),
+        0 0 0 4px rgba(124, 158, 255, 0.15);
+    }
+    .btn:active {
+      transform: translateY(0);
+      box-shadow:
+        6px 6px 12px var(--shadow-2),
+        inset 0 2px 0 rgba(0,0,0,0.08);
+    }
+    .btn-primary {
+      background: linear-gradient(180deg, rgba(124,158,255,0.25), rgba(0,0,0,0.06));
+      border-color: rgba(124,158,255,0.5);
+    }
+    .btn-success {
+      background: linear-gradient(180deg, rgba(86,242,198,0.35), rgba(0,0,0,0.06));
+      border-color: rgba(86,242,198,0.5);
+    }
+    .btn-ghost {
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.04));
+    }
+    .btn:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
+
+    .stage {
+      position: relative;
+      min-height: 320px;
+      display: grid;
+      grid-template-columns: 1fr;
+      place-items: center;
+    }
+
+    .deck-stack {
+      position: absolute;
+      left: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 96px;
+      height: 140px;
+      perspective: 800px;
+      pointer-events: none;
+    }
+    .deck-card {
+      position: absolute;
+      inset: 0;
+      border-radius: 12px;
+      background: linear-gradient(145deg, #0f1738, #1a275a);
+      border: 1px solid rgba(255,255,255,0.15);
+      box-shadow:
+        12px 12px 24px var(--shadow-2),
+        -6px -6px 18px rgba(255,255,255,0.05),
+        inset 0 1px 0 rgba(255,255,255,0.08);
+      transform: translateZ(0);
+    }
+    .deck-card:nth-child(1) { transform: translate(3px, 4px) rotate(-3deg); }
+    .deck-card:nth-child(2) { transform: translate(8px, 0px) rotate(2deg); }
+    .deck-card:nth-child(3) { transform: translate(12px, -6px) rotate(-1deg); }
+    .deck-card:nth-child(4) { transform: translate(16px, -12px) rotate(4deg); }
+    .deck-card:nth-child(5) { transform: translate(20px, -18px) rotate(-2deg); }
+
+    @keyframes shuffleWiggle {
+      0% { transform: translate(20px, -18px) rotate(-2deg); }
+      30% { transform: translate(0px, -22px) rotate(4deg); }
+      60% { transform: translate(26px, -10px) rotate(-6deg); }
+      100% { transform: translate(20px, -18px) rotate(-2deg); }
+    }
+    .shuffling .deck-card:nth-child(5) {
+      animation: shuffleWiggle 0.6s ease-in-out 2;
+    }
+
+    .card {
+      width: 240px;
+      height: 340px;
+      perspective: 1200px;
+    }
+    .card-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border-radius: 16px;
+      transform-style: preserve-3d;
+      transition: transform 0.8s cubic-bezier(.2,.8,.2,1);
+    }
+    .card.is-flipped .card-inner {
+      transform: rotateY(180deg);
+    }
+    .card-face {
+      position: absolute;
+      inset: 0;
+      border-radius: 16px;
+      overflow: hidden;
+      backface-visibility: hidden;
+      border: 1px solid var(--border);
+      box-shadow:
+        16px 16px 32px var(--shadow-1),
+        -8px -8px 24px rgba(255,255,255,0.06),
+        inset 0 1px 0 rgba(255,255,255,0.1);
+    }
+    .card-front {
+      transform: rotateY(180deg);
+      display: grid;
+      place-items: center;
+      background: var(--card-glass-strong);
+    }
+    .card-front img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: linear-gradient(180deg, rgba(0,0,0,0.06), transparent);
+    }
+    .card-back {
+      background: radial-gradient(160px 160px at 50% 20%, rgba(124,158,255,0.28), transparent 60%),
+                  radial-gradient(220px 220px at 70% 80%, rgba(27,176,122,0.2), transparent 65%),
+                  linear-gradient(180deg, #121b3a, #0b1020);
+      display: grid;
+      place-items: center;
+      position: relative;
+    }
+    .card-back::before,
+    .card-back::after {
+      content: "";
+      position: absolute;
+      width: 140%;
+      height: 3px;
+      left: -20%;
+      background: linear-gradient(90deg, transparent, rgba(124,158,255,0.9), rgba(155,255,217,0.85), transparent);
+      filter: blur(0.6px);
+      opacity: 0.6;
+      animation: sweep 5.4s linear infinite;
+    }
+    .card-back::after {
+      top: auto;
+      bottom: 30%;
+      animation-delay: 2.2s;
+      opacity: 0.4;
+    }
+    @keyframes sweep {
+      0% { transform: translateX(-10%) rotate(12deg); }
+      100% { transform: translateX(10%) rotate(12deg); }
+    }
+    .stars {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(2px 2px at 20% 30%, rgba(255,255,255,0.9), transparent 60%),
+        radial-gradient(1.5px 1.5px at 70% 65%, rgba(255,255,255,0.8), transparent 60%),
+        radial-gradient(1.7px 1.7px at 35% 80%, rgba(255,255,255,0.7), transparent 60%),
+        radial-gradient(2px 2px at 55% 25%, rgba(255,255,255,0.85), transparent 60%),
+        radial-gradient(1.8px 1.8px at 85% 45%, rgba(255,255,255,0.9), transparent 60%);
+      opacity: 0.8;
+      filter: drop-shadow(0 0 6px rgba(124,158,255,0.5));
+      animation: twinkle 3.8s ease-in-out infinite;
+    }
+    @keyframes twinkle {
+      0%, 100% { opacity: 0.8; }
+      50% { opacity: 0.45; }
+    }
+
+    .float {
+      animation: floatY 6s ease-in-out infinite;
+    }
+    @keyframes floatY {
+      0%   { transform: translateY(0px); }
+      50%  { transform: translateY(-6px); }
+      100% { transform: translateY(0px); }
+    }
+
+    .panel {
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--card-glass);
+      backdrop-filter: blur(14px) saturate(160%);
+      -webkit-backdrop-filter: blur(14px) saturate(160%);
+      box-shadow:
+        10px 10px 22px var(--shadow-2),
+        -6px -6px 16px rgba(255,255,255,0.05),
+        inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+
+    .history {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: 88px;
+      gap: 12px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scroll-snap-type: x mandatory;
+    }
+    .history-item {
+      height: 120px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--card-glass-strong);
+      display: grid;
+      place-items: center;
+      box-shadow:
+        8px 8px 18px var(--shadow-2),
+        inset 0 1px 0 rgba(255,255,255,0.08);
+      scroll-snap-align: start;
+    }
+    .history-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: linear-gradient(180deg, rgba(0,0,0,0.06), transparent);
+    }
+    .history::-webkit-scrollbar {
+      height: 8px;
+    }
+    .history::-webkit-scrollbar-thumb {
+      background: rgba(124,158,255,0.4);
+      border-radius: 999px;
+    }
+
+    .badge {
+      border-radius: 999px;
+      padding: 0.25rem 0.5rem;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.06));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    :focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
+
+    #starfield {
+      position: fixed;
+      z-index: 0;
+      inset: 0;
+    }
+
+    @media (max-width: 640px) {
+      .deck-stack { display: none; }
+      .card { width: 200px; height: 280px; }
+      .history { grid-auto-columns: 72px; }
+      .history-item { height: 96px; }
+    }
+  </style>
+</head>
+<body class="min-h-screen antialiased selection:bg-blue-400/40 selection:text-white">
+  <!-- SVG Noise Filter -->
+  <svg id="noise-filter" xmlns="http://www.w3.org/2000/svg">
+    <filter id="noise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch" />
+      <feColorMatrix type="saturate" values="0" />
+      <feComponentTransfer>
+        <feFuncA type="table" tableValues="0 0.2 0.35 0" />
+      </feComponentTransfer>
+    </filter>
+  </svg>
+
+  <!-- Starfield canvas -->
+  <canvas id="starfield" aria-hidden="true"></canvas>
+  <div class="noise-overlay" aria-hidden="true"></div>
+
+  <!-- Header -->
+  <header class="relative z-10">
+    <nav class="max-w-6xl mx-auto px-4 sm:px-6 pt-6">
+      <div class="glass flex items-center justify-between p-3 sm:p-4">
+        <div class="flex items-center gap-3">
+          <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-500/60 to-teal-300/50 shadow-lg shadow-blue-900/30 grid place-items-center">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M5 10c6-6 8-6 14 0M7 14c4-4 6-4 10 0" stroke="currentColor" stroke-width="1.6" opacity="0.7"/>
+              <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.2" opacity="0.5"/>
+              <circle cx="18" cy="6" r="1.2" fill="currentColor" />
+            </svg>
+          </div>
+          <div class="leading-tight">
+            <h1 class="text-xl sm:text-2xl font-bold tracking-tight" style="font-family: 'Space Grotesk', Inter, system-ui">
+              Drawing Cards
+            </h1>
+            <p class="text-sm text-[color:var(--muted)]">Survival On the Moon</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button id="themeToggle" class="btn btn-ghost px-3 py-2 flex items-center gap-2" aria-label="Toggle dark mode">
+            <span class="sr-only">Toggle theme</span>
+            <svg id="iconMoon" width="18" height="18" viewBox="0 0 24 24" fill="none" class="opacity-90"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="1.6"/></svg>
+            <svg id="iconSun" width="18" height="18" viewBox="0 0 24 24" fill="none" class="hidden opacity-90"><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/><path d="M12 2v2m0 16v2m10-10h-2M4 12H2m15.535 6.364-1.414-1.414M7.879 7.879 6.465 6.465m12.728 0-1.414 1.414M7.879 16.121 6.465 17.535" stroke="currentColor" stroke-width="1.6"/></svg>
+          </button>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <!-- Main -->
+  <main class="relative z-10 max-w-6xl mx-auto px-4 sm:px-6">
+    <!-- Hero -->
+    <section class="mt-8 sm:mt-12 glass p-5 sm:p-8">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Left: Stage -->
+        <div class="stage">
+          <!-- Deck stack -->
+          <div id="deckStack" class="deck-stack float" aria-hidden="true">
+            <div class="deck-card"></div>
+            <div class="deck-card"></div>
+            <div class="deck-card"></div>
+            <div class="deck-card"></div>
+            <div class="deck-card"></div>
+          </div>
+
+          <!-- Card -->
+          <div id="drawnCard" class="card" aria-live="polite">
+            <div class="card-inner" id="cardInner">
+              <div class="card-face card-back">
+                <div class="stars"></div>
+                <div class="text-center px-4">
+                  <div class="mx-auto mb-2 h-10 w-10 rounded-full grid place-items-center bg-[color:var(--card-glass-strong)] border border-[color:var(--border)] shadow-inner">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M12 2l2.39 6.955L22 9.27l-5 4.33L18.18 22 12 18.27 5.82 22 7 13.6l-5-4.33 7.61-0.315L12 2z" stroke="currentColor" stroke-width="1.1" opacity="0.7"/>
+                    </svg>
+                  </div>
+                  <p class="text-sm text-[color:var(--muted)]">Your card will appear here</p>
+                </div>
+              </div>
+              <div class="card-face card-front">
+                <img id="cardImage" src="" alt="Drawn card" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Controls -->
+        <div class="panel p-4 sm:p-6">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h2 class="text-lg sm:text-xl font-semibold">Draw a Card</h2>
+              <p class="text-sm text-[color:var(--muted)]">Click draw to shuffle and reveal a card from the 8 GitHub image URLs.</p>
+            </div>
+            <span id="deckCount" class="badge whitespace-nowrap">Remaining: —</span>
+          </div>
+
+          <div class="mt-4 flex flex-wrap items-center gap-3">
+            <button id="btnDraw" class="btn btn-primary px-4 py-2 font-semibold">Draw Card</button>
+            <button id="btnReshuffle" class="btn btn-success px-4 py-2" aria-label="Reshuffle deck">Reshuffle</button>
+            <button id="btnSettings" class="btn btn-ghost px-4 py-2" aria-expanded="false" aria-controls="settingsPanel">Settings</button>
+          </div>
+
+          <!-- Settings collapsible -->
+          <div id="settingsPanel" class="mt-4 hidden">
+            <div class="grid sm:grid-cols-2 gap-4">
+              <label class="block">
+                <span class="text-sm text-[color:var(--muted)]">Use first N URLs</span>
+                <input id="maxInput" type="number" value="8" min="1" max="8" class="mt-1 w-full px-3 py-2 rounded-md bg-transparent border border-[color:var(--border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--focus)]" />
+              </label>
+              <label class="block">
+                <span class="text-sm text-[color:var(--muted)]">Shuffle intensity</span>
+                <select id="shuffleIntensity" class="mt-1 w-full px-3 py-2 rounded-md bg-transparent border border-[color:var(--border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--focus)]">
+                  <option value="1">Light</option>
+                  <option value="2" selected>Normal</option>
+                  <option value="3">Strong</option>
+                </select>
+              </label>
+            </div>
+            <p class="mt-3 text-xs text-[color:var(--muted)]">Tip: Press Enter to draw, R to reshuffle.</p>
+          </div>
+
+          <div class="mt-6">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="font-semibold">Recent draws</h3>
+              <button id="btnClearHistory" class="btn btn-ghost px-3 py-1.5 text-sm">Clear</button>
+            </div>
+            <div class="history" id="history" aria-label="Recently drawn cards"></div>
+          </div>
+
+          <div id="live" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Info -->
+   
+
+    <!-- Footer -->
+    <footer class="mt-10 mb-8">
+      <div class="panel p-5 text-center">
+        <p class="text-sm">
+          CSTEM Lab, Faculty of Education, The University of Hong Kong
+        </p>
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    (function() {
+      "use strict";
+
+      // THEME (safe localStorage)
+      const root = document.documentElement;
+      const themeToggle = document.getElementById('themeToggle');
+      const iconMoon = document.getElementById('iconMoon');
+      const iconSun = document.getElementById('iconSun');
+
+      function getPreferredTheme() {
+        try {
+          const stored = window.localStorage ? localStorage.getItem('theme') : null;
+          if (stored) return stored;
+        } catch (e) {}
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      }
+      function applyTheme(theme) {
+        root.setAttribute('data-theme', theme);
+        const isLight = theme === 'light';
+        iconSun.classList.toggle('hidden', !isLight);
+        iconMoon.classList.toggle('hidden', isLight);
+        try {
+          if (window.localStorage) localStorage.setItem('theme', theme);
+        } catch (e) {}
+      }
+      applyTheme(getPreferredTheme());
+      themeToggle.addEventListener('click', () => {
+        const next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+        applyTheme(next);
+      });
+
+      // URL LIST: exactly 8 cards using provided GitHub blob URL format (add ?raw=1 so image loads)
+      const BASE = 'https://github.com/PHC1125/drawcards/blob/04d8f528cfd03555870aca5855cde67c84a1378e/';
+      const TOTAL = 8;
+      const cardList = Array.from({ length: TOTAL }, (_, i) => {
+        const n = i + 1;
+        const url = `${BASE}${n}.png?raw=1`;
+        return { full: url, thumb: url, alt: `Card ${n}` };
+      });
+
+      // CONTROLS
+      const settingsBtn = document.getElementById('btnSettings');
+      const settingsPanel = document.getElementById('settingsPanel');
+      const deckCount = document.getElementById('deckCount');
+      const maxInput = document.getElementById('maxInput');
+      const intensitySelect = document.getElementById('shuffleIntensity');
+      const btnDraw = document.getElementById('btnDraw');
+      const btnReshuffle = document.getElementById('btnReshuffle');
+      const btnClearHistory = document.getElementById('btnClearHistory');
+      const deckStack = document.getElementById('deckStack');
+      const card = document.getElementById('drawnCard');
+      const cardInner = document.getElementById('cardInner');
+      const cardImage = document.getElementById('cardImage');
+      const historyWrap = document.getElementById('history');
+      const live = document.getElementById('live');
+
+      // settings bounds reflect list length (8)
+      maxInput.max = String(cardList.length);
+      maxInput.value = String(cardList.length);
+
+      settingsBtn.addEventListener('click', () => {
+        const expanded = settingsBtn.getAttribute('aria-expanded') === 'true';
+        settingsBtn.setAttribute('aria-expanded', String(!expanded));
+        settingsPanel.classList.toggle('hidden');
+      });
+
+      // DECK STATE
+      let requestedMax = cardList.length; // up to 8
+      let deck = [];
+      let isDrawing = false;
+      let history = [];
+
+      function buildDeck() {
+        const n = Math.max(1, Math.min(cardList.length, requestedMax));
+        deck = Array.from({ length: n }, (_, i) => i + 1);
+        updateCount();
+      }
+      function updateCount() {
+        deckCount.textContent = 'Remaining: ' + deck.length;
+      }
+      function announce(msg) {
+        live.textContent = '';
+        setTimeout(() => { live.textContent = msg; }, 30);
+      }
+      function setButtons(disabled) {
+        btnDraw.disabled = disabled;
+        btnReshuffle.disabled = disabled;
+        btnClearHistory.disabled = disabled;
+        [btnDraw, btnReshuffle, btnClearHistory].forEach(el => {
+          el.style.opacity = disabled ? 0.6 : 1;
+          el.style.cursor = disabled ? 'not-allowed' : 'pointer';
+        });
+      }
+      function updateHistory() {
+        historyWrap.innerHTML = '';
+        history.slice(-12).forEach(n => {
+          const item = document.createElement('div');
+          item.className = 'history-item';
+          const img = document.createElement('img');
+          img.src = cardList[n - 1].thumb;
+          img.alt = cardList[n - 1].alt || ('Card ' + n);
+          item.appendChild(img);
+          historyWrap.appendChild(item);
+        });
+        historyWrap.scrollTo({ left: historyWrap.scrollWidth, behavior: 'smooth' });
+      }
+
+      function flipToFront() {
+        card.classList.add('is-flipped');
+      }
+      function flipToBack() {
+        card.classList.remove('is-flipped');
+      }
+
+      function animateShuffleOnce(intensity = 2) {
+        return new Promise(resolve => {
+          const times = Math.max(1, Math.min(3, Number(intensity) || 2));
+          deckStack.classList.add('shuffling');
+          const total = 700 * times;
+          setTimeout(() => {
+            deckStack.classList.remove('shuffling');
+            resolve();
+          }, total);
+        });
+      }
+
+      async function drawCard() {
+        if (isDrawing) return;
+        if (deck.length === 0) {
+          announce('Deck empty. Reshuffling.');
+          await reshuffle();
+          return;
+        }
+        isDrawing = true;
+        setButtons(true);
+        flipToBack();
+
+        await animateShuffleOnce(intensitySelect.value);
+
+        // pick random from deck
+        const idx = Math.floor(Math.random() * deck.length);
+        const picked = deck[idx];
+        deck.splice(idx, 1);
+
+        // Reveal
+        const { full, alt } = cardList[picked - 1];
+        cardImage.src = full;
+        cardImage.alt = alt || ('Card ' + picked);
+
+        setTimeout(() => {
+          flipToFront();
+          card.style.transition = 'transform 160ms ease';
+          card.style.transform = 'translateY(-2px) scale(1.01)';
+          setTimeout(() => {
+            card.style.transform = '';
+            card.style.transition = '';
+          }, 180);
+        }, 60);
+
+        history.push(picked);
+        updateHistory();
+        updateCount();
+        announce('Drew ' + (alt || ('card ' + picked)) + '. ' + deck.length + ' remaining.');
+        btnDraw.textContent = 'Draw Again';
+        setButtons(false);
+        isDrawing = false;
+      }
+
+      async function reshuffle() {
+        if (isDrawing) return;
+        isDrawing = true;
+        setButtons(true);
+        flipToBack();
+        await animateShuffleOnce(1);
+        buildDeck();
+        announce('Deck reshuffled. ' + deck.length + ' cards available.');
+        setButtons(false);
+        isDrawing = false;
+      }
+
+      btnDraw.addEventListener('click', drawCard);
+      btnReshuffle.addEventListener('click', reshuffle);
+      btnClearHistory.addEventListener('click', () => {
+        history = [];
+        updateHistory();
+        announce('History cleared.');
+      });
+      maxInput.addEventListener('change', () => {
+        const val = Math.max(1, Math.min(cardList.length, Number(maxInput.value) || cardList.length));
+        if (val !== Number(maxInput.value)) {
+          announce('Clamped to available URLs: ' + val);
+        }
+        requestedMax = val;
+        maxInput.value = String(val);
+        buildDeck();
+        announce('Using first ' + val + ' URL(s). Deck reshuffled.');
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          btnDraw.click();
+        }
+        if (e.key.toLowerCase() === 'r') {
+          e.preventDefault();
+          btnReshuffle.click();
+        }
+      });
+
+      // Init
+      buildDeck();
+      updateHistory();
+
+      // Starfield background (Canvas)
+      const canvas = document.getElementById('starfield');
+      const ctx = canvas.getContext('2d');
+      let stars = [];
+      let DPR = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+
+      function resizeCanvas() {
+        const { innerWidth: w, innerHeight: h } = window;
+        canvas.width = w * DPR;
+        canvas.height = h * DPR;
+        canvas.style.width = w + 'px';
+        canvas.style.height = h + 'px';
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        spawnStars();
+      }
+
+      function spawnStars() {
+        const w = canvas.width / DPR;
+        const h = canvas.height / DPR;
+        const count = Math.floor(Math.max(160, Math.min(420, (w*h)/4500)));
+        stars = [];
+        for (let i=0; i<count; i++) {
+          stars.push({
+            x: Math.random()*w,
+            y: Math.random()*h,
+            z: Math.random()*1 + 0.2,
+            r: Math.random()*1.2 + 0.3,
+            tw: Math.random()*Math.PI*2
+          });
+        }
+      }
+
+      function render() {
+        const w = canvas.width / DPR;
+        const h = canvas.height / DPR;
+        ctx.clearRect(0,0,w,h);
+
+        const grad = ctx.createRadialGradient(w*0.8,h*0.12,10, w*0.8,h*0.12, Math.max(w,h)*0.8);
+        grad.addColorStop(0, 'rgba(124,158,255,0.09)');
+        grad.addColorStop(1, 'rgba(124,158,255,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0,0,w,h);
+
+        for (let i=0; i<stars.length; i++) {
+          const s = stars[i];
+          s.y += 0.02 + s.z*0.04;
+          if (s.y > h + 2) s.y = -2;
+          s.tw += 0.03 + s.z*0.02;
+          const alpha = 0.35 + Math.abs(Math.sin(s.tw))*0.45;
+          ctx.fillStyle = `rgba(230, 238, 255, ${alpha})`;
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r*(0.8 + s.z*0.6), 0, Math.PI*2);
+          ctx.fill();
+          ctx.fillStyle = `rgba(124, 158, 255, ${alpha*0.18})`;
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r*2.2, 0, Math.PI*2);
+          ctx.fill();
+        }
+        requestAnimationFrame(render);
+      }
+
+      resizeCanvas();
+      window.addEventListener('resize', resizeCanvas);
+      render();
+    })();
+  </script>
+</body>
+</html>
