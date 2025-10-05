@@ -11,6 +11,9 @@
   <!-- Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
+  <!-- SortableJS for drag and drop -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
   <style>
     :root {
       --bg1: #0b1020;
@@ -59,7 +62,6 @@
       font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
     }
 
-    /* Subtle noise overlay using SVG filter (no external images) */
     .noise-overlay {
       position: fixed;
       inset: 0;
@@ -106,13 +108,13 @@
         inset 0 1px 0 rgba(255,255,255,0.08);
       transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.3s ease, opacity 0.2s ease;
     }
-    .btn:hover {
+    .btn:hover:not(:disabled) {
       transform: translateY(-1px);
       box-shadow:
         12px 12px 24px var(--shadow-2),
         0 0 0 4px rgba(124, 158, 255, 0.15);
     }
-    .btn:active {
+    .btn:active:not(:disabled) {
       transform: translateY(0);
       box-shadow:
         6px 6px 12px var(--shadow-2),
@@ -345,11 +347,111 @@
       inset: 0;
     }
 
+    /* Equipment ranking styles */
+    .equipment-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .equipment-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--card-glass-strong);
+      backdrop-filter: blur(10px);
+      box-shadow:
+        6px 6px 14px var(--shadow-2),
+        inset 0 1px 0 rgba(255,255,255,0.08);
+      cursor: move;
+      transition: all 0.25s ease;
+      user-select: none;
+    }
+    .equipment-item:hover {
+      background: rgba(124,158,255,0.12);
+      box-shadow:
+        8px 8px 18px var(--shadow-2),
+        0 0 0 2px rgba(124,158,255,0.3);
+    }
+    .equipment-item.sortable-ghost {
+      opacity: 0.4;
+      background: rgba(124,158,255,0.2);
+    }
+    .equipment-item.sortable-drag {
+      opacity: 0.9;
+      box-shadow:
+        14px 14px 28px var(--shadow-1),
+        0 0 0 3px rgba(124,158,255,0.5);
+      transform: scale(1.02);
+    }
+    .equipment-item.removing {
+      animation: fadeOutSlide 0.5s ease forwards;
+    }
+    @keyframes fadeOutSlide {
+      0% {
+        opacity: 1;
+        transform: translateX(0);
+      }
+      100% {
+        opacity: 0;
+        transform: translateX(100px);
+      }
+    }
+    .rank-number {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, rgba(124,158,255,0.3), rgba(155,255,217,0.2));
+      border: 1px solid rgba(124,158,255,0.4);
+      font-weight: 700;
+      font-size: 0.875rem;
+      color: var(--text);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.15);
+    }
+    .equipment-name {
+      flex: 1;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--text);
+    }
+    .drag-handle {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      opacity: 0.5;
+      transition: opacity 0.2s;
+    }
+    .equipment-item:hover .drag-handle {
+      opacity: 0.9;
+    }
+    .drag-handle span {
+      width: 18px;
+      height: 2px;
+      background: currentColor;
+      border-radius: 2px;
+    }
+
     @media (max-width: 640px) {
       .deck-stack { display: none; }
       .card { width: 200px; height: 280px; }
       .history { grid-auto-columns: 72px; }
       .history-item { height: 96px; }
+      .equipment-item {
+        padding: 12px 14px;
+      }
+      .rank-number {
+        min-width: 28px;
+        height: 28px;
+        font-size: 0.8rem;
+      }
+      .equipment-name {
+        font-size: 0.875rem;
+      }
     }
   </style>
 </head>
@@ -385,7 +487,7 @@
             <h1 class="text-xl sm:text-2xl font-bold tracking-tight" style="font-family: 'Space Grotesk', Inter, system-ui">
               Drawing Cards
             </h1>
-            <p class="text-sm text-[color:var(--muted)]">Survival On the Moon</p>
+            <p class="text-sm text-[color:var(--muted)]">Space-themed card drawer</p>
           </div>
         </div>
 
@@ -485,14 +587,132 @@
       </div>
     </section>
 
+    <!-- Equipment Ranking Section -->
+    <section class="mt-8 sm:mt-12 glass p-5 sm:p-8">
+      <div class="mb-6">
+        <h2 class="text-2xl sm:text-3xl font-bold mb-2" style="font-family: 'Space Grotesk', Inter, system-ui">
+          Select Your Equipment
+        </h2>
+        <p class="text-sm sm:text-base text-[color:var(--muted)]">
+          Drag and drop to rank these 15 items from most important (top) to least important (bottom). 
+          Click <strong>Confirm</strong> to remove the 5 least important items.
+        </p>
+      </div>
+
+      <div class="grid lg:grid-cols-2 gap-6">
+        <!-- Equipment List -->
+        <div>
+          <div class="mb-4 flex items-center justify-between">
+            <h3 class="font-semibold text-lg">Rank Your Equipment</h3>
+            <span id="equipmentCount" class="badge">15 items</span>
+          </div>
+          <div id="equipmentList" class="equipment-list" role="list" aria-label="Equipment ranking list">
+            <!-- Items will be generated by JS -->
+          </div>
+        </div>
+
+        <!-- Instructions & Actions -->
+        <div class="panel p-5 sm:p-6">
+          <h3 class="font-semibold text-lg mb-3">Instructions</h3>
+          <ul class="space-y-2 text-sm text-[color:var(--muted)] mb-6">
+            <li class="flex items-start gap-2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="mt-0.5 flex-shrink-0" aria-hidden="true">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" stroke="currentColor" stroke-width="1.6"/>
+              </svg>
+              <span>Drag items up or down to reorder them by importance</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="mt-0.5 flex-shrink-0" aria-hidden="true">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" stroke="currentColor" stroke-width="1.6"/>
+              </svg>
+              <span>Position #1 is the most important equipment</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="mt-0.5 flex-shrink-0" aria-hidden="true">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" stroke="currentColor" stroke-width="1.6"/>
+              </svg>
+              <span>Position #15 is the least important equipment</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="mt-0.5 flex-shrink-0" aria-hidden="true">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" stroke="currentColor" stroke-width="1.6"/>
+              </svg>
+              <span>After confirming, the bottom 5 items will be removed</span>
+            </li>
+          </ul>
+
+          <div class="space-y-3">
+            <button id="btnConfirmRanking" class="btn btn-primary w-full px-4 py-3 font-semibold text-base">
+              Confirm Selection
+            </button>
+            <button id="btnResetRanking" class="btn btn-ghost w-full px-4 py-2">
+              Reset Order
+            </button>
+          </div>
+
+          <div id="rankingResult" class="mt-6 hidden">
+            <div class="p-4 rounded-lg border border-[color:var(--success)] bg-[color:var(--card-glass-strong)]">
+              <h4 class="font-semibold text-[color:var(--success)] mb-2 flex items-center gap-2">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                Selection Confirmed!
+              </h4>
+              <p class="text-sm text-[color:var(--muted)]">
+                You kept <strong id="keptCount">10</strong> items. The 5 least important items have been removed.
+              </p>
+            </div>
+          </div>
+
+          <div id="equipmentLiveRegion" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+        </div>
+      </div>
+    </section>
+
     <!-- Info -->
-   
+    <section class="mt-6 sm:mt-10">
+      <div class="grid md:grid-cols-3 gap-4">
+        <div class="panel p-4">
+          <div class="flex items-center gap-3">
+            <span class="h-9 w-9 rounded-lg grid place-items-center bg-[color:var(--card-glass-strong)] border border-[color:var(--border)]">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 12h18M12 3v18" stroke="currentColor" stroke-width="1.6"/></svg>
+            </span>
+            <div>
+              <h4 class="font-semibold">8 GitHub images</h4>
+              <p class="text-sm text-[color:var(--muted)]">Loaded directly from provided blob URLs.</p>
+            </div>
+          </div>
+        </div>
+        <div class="panel p-4">
+          <div class="flex items-center gap-3">
+            <span class="h-9 w-9 rounded-lg grid place-items-center bg-[color:var(--card-glass-strong)] border border-[color:var(--border)]">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z" stroke="currentColor" stroke-width="1.6"/><path d="M8 12h8" stroke="currentColor" stroke-width="1.6"/></svg>
+            </span>
+            <div>
+              <h4 class="font-semibold">No repeats (per deck)</h4>
+              <p class="text-sm text-[color:var(--muted)]">Each URL appears once until you reshuffle.</p>
+            </div>
+          </div>
+        </div>
+        <div class="panel p-4">
+          <div class="flex items-center gap-3">
+            <span class="h-9 w-9 rounded-lg grid place-items-center bg-[color:var(--card-glass-strong)] border border-[color:var(--border)]">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12a8 8 0 1 0 16 0A8 8 0 0 0 4 12Z" stroke="currentColor" stroke-width="1.6"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="1.6"/></svg>
+            </span>
+            <div>
+              <h4 class="font-semibold">Quick & accessible</h4>
+              <p class="text-sm text-[color:var(--muted)]">Keyboard shortcuts and screen reader announcements included.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <!-- Footer -->
     <footer class="mt-10 mb-8">
       <div class="panel p-5 text-center">
         <p class="text-sm">
-          CSTEM Lab, Faculty of Education, The University of Hong Kong
+          Faculty of Education, The University of Hong Kong
         </p>
       </div>
     </footer>
@@ -698,11 +918,11 @@
       });
 
       document.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT' && e.target.tagName !== 'BUTTON') {
           e.preventDefault();
           btnDraw.click();
         }
-        if (e.key.toLowerCase() === 'r') {
+        if (e.key.toLowerCase() === 'r' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
           e.preventDefault();
           btnReshuffle.click();
         }
@@ -712,7 +932,137 @@
       buildDeck();
       updateHistory();
 
-      // Starfield background (Canvas)
+      // ========== EQUIPMENT RANKING ==========
+      const equipmentItems = [
+        'Box of matches',
+        'Food concentrate',
+        'Nylon rope',
+        'Parachute silk',
+        'Portable heating unit',
+        'Two pistols',
+        'Dehydrated milk',
+        'Two 100 lb. tanks of oxygen',
+        'Stellar map',
+        'Self-inflating life raft',
+        'Magnetic compass',
+        '20 liters of water',
+        'Mirror',
+        'First aid kit with injection needle',
+        'Solar-powered FM receiver-transmitter'
+      ];
+
+      const equipmentList = document.getElementById('equipmentList');
+      const equipmentCount = document.getElementById('equipmentCount');
+      const btnConfirmRanking = document.getElementById('btnConfirmRanking');
+      const btnResetRanking = document.getElementById('btnResetRanking');
+      const rankingResult = document.getElementById('rankingResult');
+      const keptCount = document.getElementById('keptCount');
+      const equipmentLiveRegion = document.getElementById('equipmentLiveRegion');
+
+      let currentEquipment = [...equipmentItems];
+      let sortableInstance = null;
+      let isConfirmed = false;
+
+      function renderEquipment() {
+        equipmentList.innerHTML = '';
+        currentEquipment.forEach((item, index) => {
+          const div = document.createElement('div');
+          div.className = 'equipment-item';
+          div.setAttribute('data-id', item);
+          div.setAttribute('role', 'listitem');
+          div.innerHTML = `
+            <div class="rank-number">${index + 1}</div>
+            <div class="equipment-name">${item}</div>
+            <div class="drag-handle" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          `;
+          equipmentList.appendChild(div);
+        });
+        equipmentCount.textContent = `${currentEquipment.length} items`;
+      }
+
+      function initSortable() {
+        if (sortableInstance) {
+          sortableInstance.destroy();
+        }
+        sortableInstance = Sortable.create(equipmentList, {
+          animation: 200,
+          ghostClass: 'sortable-ghost',
+          dragClass: 'sortable-drag',
+          handle: '.equipment-item',
+          onEnd: function(evt) {
+            // Update the array order
+            const item = currentEquipment.splice(evt.oldIndex, 1)[0];
+            currentEquipment.splice(evt.newIndex, 0, item);
+            renderEquipment();
+            equipmentLiveRegion.textContent = `Moved ${item} from position ${evt.oldIndex + 1} to position ${evt.newIndex + 1}`;
+          }
+        });
+      }
+
+      function confirmRanking() {
+        if (isConfirmed) return;
+        if (currentEquipment.length <= 5) {
+          equipmentLiveRegion.textContent = 'Cannot confirm: you need at least 6 items to remove 5.';
+          return;
+        }
+
+        isConfirmed = true;
+        btnConfirmRanking.disabled = true;
+        btnConfirmRanking.style.opacity = '0.6';
+        btnConfirmRanking.style.cursor = 'not-allowed';
+
+        // Get last 5 items to remove
+        const toRemove = currentEquipment.slice(-5);
+        const toKeep = currentEquipment.slice(0, -5);
+
+        // Animate removal
+        const items = equipmentList.querySelectorAll('.equipment-item');
+        const removeItems = Array.from(items).slice(-5);
+
+        removeItems.forEach((el, i) => {
+          setTimeout(() => {
+            el.classList.add('removing');
+          }, i * 100);
+        });
+
+        setTimeout(() => {
+          currentEquipment = toKeep;
+          renderEquipment();
+          initSortable();
+          
+          rankingResult.classList.remove('hidden');
+          keptCount.textContent = currentEquipment.length;
+          equipmentLiveRegion.textContent = `Confirmed! Removed 5 items: ${toRemove.join(', ')}. You kept ${currentEquipment.length} items.`;
+          
+          // Scroll to result
+          rankingResult.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 600);
+      }
+
+      function resetRanking() {
+        currentEquipment = [...equipmentItems];
+        isConfirmed = false;
+        btnConfirmRanking.disabled = false;
+        btnConfirmRanking.style.opacity = '1';
+        btnConfirmRanking.style.cursor = 'pointer';
+        rankingResult.classList.add('hidden');
+        renderEquipment();
+        initSortable();
+        equipmentLiveRegion.textContent = 'Equipment list reset to original order.';
+      }
+
+      btnConfirmRanking.addEventListener('click', confirmRanking);
+      btnResetRanking.addEventListener('click', resetRanking);
+
+      // Initialize equipment list
+      renderEquipment();
+      initSortable();
+
+      // ========== STARFIELD BACKGROUND ==========
       const canvas = document.getElementById('starfield');
       const ctx = canvas.getContext('2d');
       let stars = [];
